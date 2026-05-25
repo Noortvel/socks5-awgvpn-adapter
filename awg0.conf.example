@@ -1,0 +1,24 @@
+[Interface]
+Address = 10.8.1.12/32
+DNS = 1.1.1.1, 1.0.0.1
+PrivateKey = ${PrivateKey}
+Jc = 5
+Jmin = 50
+Jmax = 150
+S1 = 63
+S2 = 92
+S3 = 52
+S4 = 16
+H1 = 1620487809-1664242617
+H2 = 1974121198-2069639829
+H3 = 2075722075-2119149070
+H4 = 2127057628-2147277360
+I1 = <r 2><b 0x858000010001000000000669636c6f756403636f6d0000010001c00c000100010000105a00044d583737>
+MTU = 1420
+
+[Peer]
+PublicKey = ${PublicKey}
+PresharedKey = ${PresharedKey}
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = ${IPPort}
+PersistentKeepalive = 25

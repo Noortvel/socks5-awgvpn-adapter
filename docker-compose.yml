@@ -1,0 +1,50 @@
+services:
+  socks5-vpn:
+    build: .
+    container_name: socks5-amneziawg
+    ports:
+      - "1080:1080"
+    environment:
+      - SOCKS_PORT=1080
+      # - SOCKS_USER=user
+      # - SOCKS_PASS=pass
+    volumes:
+      - ./awg0.conf:/etc/amneziawg/awg0.conf:ro
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      # BBR не реагирует на потерю пакетов снижением throughput —
+      # критически важно для VPN-туннелей, где потеря = rekey, а не перегрузка.
+      # Работает если модуль tcp_bbr загружен на хосте (modprobe tcp_bbr),
+      # иначе fallback на cubic.
+      - net.ipv4.tcp_congestion_control=bbr
+      # MTU probing при обнаружении black hole (1 = search only on failure)
+      - net.ipv4.tcp_mtu_probing=1
+      - net.ipv4.tcp_fastopen=3
+      - net.ipv4.tcp_window_scaling=1
+      - net.ipv4.tcp_sack=1
+      - net.ipv4.tcp_timestamps=1
+      - net.ipv4.tcp_fin_timeout=15
+      - net.ipv4.tcp_keepalive_time=60
+      - net.ipv4.tcp_keepalive_intvl=10
+      - net.ipv4.tcp_keepalive_probes=6
+      # Уменьшены макс. буферы (16MB → 6MB) для предотвращения давления на память
+      # при множестве одновременных соединений (лимит контейнера 1GB)
+      - net.ipv4.tcp_rmem=4096 87380 6291456
+      - net.ipv4.tcp_wmem=4096 65536 6291456
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 1080 || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 15s
