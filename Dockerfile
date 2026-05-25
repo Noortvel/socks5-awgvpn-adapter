@@ -13,6 +13,7 @@ FROM alpine:3.23 AS awg-tools-builder
 RUN apk add --no-cache \
     git \
     make \
+    cmake \
     build-base \
     libmnl-dev
 
@@ -22,11 +23,22 @@ RUN git clone --depth 1 --branch v1.0.20260223 https://github.com/amnezia-vpn/am
     make WITH_WGQUICK=yes && \
     make WITH_WGQUICK=yes DESTDIR=/out install
 
-# Собираем 3proxy (SOCKS5 прокси с UDP ASSOCIATE, splice zero-copy)
+# Собираем 3proxy через CMake — гарантирует splice zero-copy (WITHSPLICE)
+# Старый Makefile.Linux мог не включать splice, что снижает throughput streaming
+# Патчим MAXSPLICE 64KB → 256KB: каждый splice chunk через pipe doubles syscalls,
+# большие чанки = меньше syscalls при streaming (YouTube и т.п.)
 RUN git clone --depth 1 --branch 0.9.6 https://github.com/3proxy/3proxy.git && \
     cd 3proxy && \
-    make -f Makefile.Linux && \
-    install -Dm755 bin/3proxy /usr/local/bin/3proxy
+    sed -i 's/^#define MAXSPLICE .*/#define MAXSPLICE 262144/' src/sockmap.c && \
+    grep -n 'MAXSPLICE' src/sockmap.c && \
+    cmake -S . -B build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -D3PROXY_USE_SPLICE=ON \
+      -D3PROXY_USE_OPENSSL=OFF \
+      -D3PROXY_USE_PCRE2=OFF \
+      -D3PROXY_USE_PAM=OFF && \
+    cmake --build build -j$(nproc) && \
+    install -Dm755 build/bin/3proxy /usr/local/bin/3proxy
 
 # ---- Stage 2: Финальный образ ----
 FROM alpine:3.23
